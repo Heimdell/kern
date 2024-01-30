@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <NoWarn>"40"</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Maybe.fs" />
+    <Compile Include="Input.fs" />
+    <Compile Include="Lexer.fs" />
+    <Compile Include="Parser.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+</Project>

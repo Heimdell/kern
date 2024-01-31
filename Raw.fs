@@ -94,5 +94,5 @@ and ppActed : acted -> string =
 (*
   Pretty-print sequence.
 *)
-let ppSeq : List<input * acted> -> string =
+let ppSeq : sequence -> string =
   String.concat "\n\n" << List.map (ppActed << snd)

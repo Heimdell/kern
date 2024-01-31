@@ -131,11 +131,16 @@ and atomic : parser<token, input * value> =
 and aList : parser<token, input * list> =
   parser {
     let! pos, i = tokOpen
-    let! elems  = many acted
-    let! trail  = optional <| parser {
-                    let! () = tokDot
-                    return! acted
-                  }
+    let! elems, trail =
+      option ([], None) <| parser {
+        let! elems  = some acted
+        let! trail  =
+          optional <| parser {
+            let! () = tokDot
+            return! acted
+          }
+        return elems, trail
+      }
     let! ()     = tokClose i
     return pos,
       { kind  = i

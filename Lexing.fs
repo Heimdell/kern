@@ -109,7 +109,7 @@ let many = Opt << Plus
   Parse a char or a comment.
 *)
 let space = Chr System.Char.IsWhiteSpace
-        <|> (one ';' &&& many (noneOf "\n") &&& one '\n')
+        <|> (one ';' &&& many (noneOf "\n"))
 
 (*
   Skip a char or a comment.

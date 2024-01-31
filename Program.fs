@@ -1,12 +1,23 @@
 
 open Lexer
 open Parser
+open Raw
 
-// testParser value "(define [singleton k v . kvs] {:k k :v v"
+(*
+  Echo-repl.
+*)
+let rec echo () =
+  System.Console.Write "> "
+  let line = System.Console.ReadLine()
 
-let is_a a = a = 'a'
-let is_b a = a = 'b'
+  ignore <| testParser acted
+    (Input.ofString line)
+    (printfn "%s" << ppActed << snd)
 
-Input.ofFile "example.lisp"
-  |> tokens
-  |> printfn "%O"
+  System.Console.WriteLine ""
+
+  echo ()
+
+printfn "Kern language REPL\n"
+
+echo ()

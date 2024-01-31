@@ -9,7 +9,10 @@
   <ItemGroup>
     <Compile Include="Maybe.fs" />
     <Compile Include="Input.fs" />
+    <Compile Include="Lexing.fs" />
+    <Compile Include="Parsing.fs" />
     <Compile Include="Lexer.fs" />
+    <Compile Include="Raw.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

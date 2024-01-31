@@ -1,358 +1,169 @@
 
 module rec Parser
 
-open Maybe
-open Lexer
+open Parsing
 open Input
+open Lexer
+open Raw
 
-type either<'a, 'b> =
-  | Ok  of 'a
-  | Err of 'b
+(*
+  Various tokens.
+*)
 
-let either (f : 'a -> 'c) (g : 'b -> 'c) : either<'a, 'b> -> 'c =
-  function
-  | Ok  a -> f a
-  | Err b -> g b
+let tokName : parser<token, input * string> =
+  deco "name" << satisfy <|
+    function
+    | Name name -> Some name
+    | _         -> None
 
-let bimap (f : 'a -> 'c) (g : 'b -> 'd) : either<'a, 'b> -> either<'c, 'd> =
-  either (Ok << f) (Err << g)
+let tokChar : parser<token, input * char> =
+  deco "char" << satisfy <|
+    function
+    | Ch ch -> Some ch
+    | _     -> None
 
-let bimap2 (f : 'a -> 'c) (g : 'b -> 'd) : 'a * 'b -> 'c * 'd =
-  fun (a, b) -> f a, g b
+let tokString : parser<token, input * string> =
+  deco "string" << satisfy <|
+    function
+    | Str str -> Some str
+    | _       -> None
 
-type tokens = list<input * token>
-type error  = Set<string>
-type result<'a> =
-  { output   : option<tokens>
-    produce  : either<error * 'a, error>
+let tokNumber : parser<token, input * float> =
+  deco "number" << satisfy <|
+    function
+    | Num num -> Some num
+    | _       -> None
+
+let tokBoolean : parser<token, input * bool> =
+  deco "boolean" << satisfy <|
+    function
+    | Bool num -> Some num
+    | _         -> None
+
+let tokOpen : parser<token, input * int> =
+  deco "'(', '[', '{'" << satisfy <|
+    function
+    | Open i -> Some i
+    | _      -> None
+
+let tokClose (i : int) : parser<token, unit> =
+  deco ("'" + closing i + "'") << map snd << satisfy <|
+    function
+    | Close j when i = j -> Some ()
+    | _                  -> None
+
+let tokDot : parser<token, unit> =
+  deco "'.'" << map snd << satisfy <|
+    function
+    | Dot -> Some ()
+    | _   -> None
+
+let tokQuote : parser<token, unit> =
+  deco "quote" << map snd << satisfy <|
+    function
+    | Quote -> Some ()
+    | _     -> None
+
+let tokSplice : parser<token, unit> =
+  deco "','" << map snd << satisfy <|
+    function
+    | Splice -> Some ()
+    | _      -> None
+
+let dump : parser<token, tokens<token>> =
+  fun input ->
+    { expected = Set []
+      output   = None
+      produce  = Some input
+    }
+
+(*
+  Parse sequence of manipulated atoms.
+*)
+let rec sequence : parser<token, List<input * acted>> =
+  many acted
+
+(*
+  Parse one manipulated atom.
+*)
+and acted : parser<token, input * acted> =
+  parser {
+    return! spliced
+    return! quoted
+    return! map (second Plain) atomic
   }
 
-type parser<'a> = tokens -> result<'a>
+(*
+  Parse splice of atom.
+*)
+and spliced : parser<token, input * acted> =
+  parser {
+    let! () = tokSplice
+    return! map (second Spliced) acted
+  }
 
-let just (x : 'a) : parser<'a> =
-  fun input ->
-    { produce  = Ok (Set [] , x)
-      output   = None
-    }
+(*
+  Parse quote of atom.
+*)
+and quoted : parser<token, input * acted> =
+  parser {
+    let! () = tokQuote
+    return! map (second Quoted) acted
+  }
 
-let empty : parser<'a> =
-  fun input ->
-    { produce  = Err (Set [])
-      output   = None
-    }
+(*
+  Parse atom.
+*)
+and atomic : parser<token, input * value> =
+  parser {
+    return! map (second VList) aList
+    return! map (second VName) tokName
+    return! map (second VNum)  tokNumber
+    return! map (second VBool) tokBoolean
+    return! map (second VStr)  tokString
+    return! map (second VChar) tokChar
+  }
 
-let satisfy (pred : token -> bool) : parser<input * token> =
-  function
-  | [] ->
-    { produce  = Err (Set [])
-      output   = None
-    }
-  | ((pos, tok) :: rest) as input ->
-    if pred tok
-    then
-      { produce  = Ok (Set [], (pos, tok))
-        output   = Some rest
+(*
+  Parse list of manipulated atoms.
+*)
+
+and aList : parser<token, input * list> =
+  parser {
+    let! pos, i = tokOpen
+    let! elems  = many acted
+    let! trail  = optional <| parser {
+                    let! () = tokDot
+                    return! acted
+                  }
+    let! ()     = tokClose i
+    return pos,
+      { kind  = i
+        elems = elems
+        trail = trail
       }
-    else
-      { produce  = Err (Set [])
-        output   = None
-      }
+  }
 
-// let bind (ma : parser<'a>) (k : 'a -> parser<'b>) : parser<'b> =
-  // fun input ->
-  //   match ma input with
-  //   | { produce = Err errs_a
-  //       output  = None
-  //     } ->
-  //     match mb input with
-  //     | { produce = Err errs_b
-  //         output  = output_b
-  //       } ->
-  //       {
-
-  //       }
-
-// let choose (ma : parser<'a>) (mb : parser<'a>) : parser<'a> =
-//   fun input ->
-//     let a = ma input
-//     match a.produce, a.consumed with
-//     | Err warns, false ->
-//       let b = mb input
-//       match b.produce, b.consumed with
-//       | Err errs, false ->
-//         { produce  = Err (warns + errs)
-//           consumed = false
-//           output   = input
-//         }
-//       | Ok (warns_b, vb), _ ->
-//         { produce  = Ok (warns + warns_b, vb)
-//           consumed = b.consumed
-//           output   = b.output
-//         }
-//       | _ -> b
-//     | _ -> a
-
-// let select (ms : List<parser<'a>>) = List.fold choose empty ms
-
-// let option (a : 'a) (ma : parser<'a>) : parser<'a> =
-//   select
-//     [ ma
-//       just a
-//     ]
-
-// let manip (ma : parser<'a>) (m : tokens -> result<'a> -> result<'b>) : parser<'b> =
-//   fun input ->
-//     m input (ma input)
-
-// let rollback (ma : parser<'a>) : parser<'a> =
-//   manip ma <| fun input res ->
-//     match res.produce with
-//     | Ok  x ->   res
-//     | Err _ ->
-//       { res with
-//           consumed = false
-//           output   = input
-//       }
-
-// let notFollowedBy (ma : parser<'a>) : parser<unit> =
-//   manip ma <| fun input res ->
-//     { produce =
-//         match res.produce with
-//         | Ok  x -> Err (Set [])
-//         | Err _ -> Ok  (Set [], ())
-//       output   = input
-//       consumed = false
-//     }
-
-// let map (f : 'a -> 'b) (ma : parser<'a>) : parser<'b> =
-//   manip ma <| fun input res ->
-//     { produce  = bimap (bimap2 id f) id res.produce
-//       consumed = res.consumed
-//       output   = res.output
-//     }
-
-// let optional (ma : parser<'a>) : parser<option<'a>> =
-//   select
-//     [ map (fun a -> Some a) ma
-//       just None
-//     ]
-
-// // // let ap
-// // //   (mf : parser<'a -> 'b>)
-// // //   (mx : parser<'a>)
-// // //       : parser<'b>
-// // //     =
-// // //   bind mf <| fun f -> map f mx
-
-// // // let deco (msg : string) (ma : parser<'a>) : parser<'a> =
-// // //   manip ma <| fun _ res ->
-// // //     match res with
-// // //     | {result = Err _; output = 0} -> {result = Err [msg]; output = 0}
-// // //     | other                        -> other
-
-// // // type ParserMonad() =
-// // //   member it.Bind(ma, amb)  = bind ma amb
-// // //   member it.Return(x)      = just x
-// // //   // member it.ReturnFrom(ma) = ma
-
-// // // let parser = new ParserMonad()
-
-// // // let rec many (ma : parser<'a>) : parser<List<'a>> =
-// // //   select
-// // //     [ some ma
-// // //       just []
-// // //     ]
-
-// // // and some (ma : parser<'a>) : parser<List<'a>> =
-// // //   parser {
-// // //     let! x  = ma
-// // //     let! xs = many ma
-// // //     return (x :: xs)
-// // //   }
-
-// // // let guard (b : bool) : parser<unit> =
-// // //   if b then just () else empty
-
-// // // let nameChar : parser<char> = satisfy <| fun c ->
-// // //      c >= 'a' && c <= 'z'
-// // //   || c = '-'
-// // //   || c = '!'
-// // //   || c = '?'
-
-// // // let name : parser<string> = trace (some nameChar) |> deco "name"
-
-// // // let digit : parser<char> = satisfy <| fun c -> c >= '0' && c <= '9'
-
-// // // let char (c : char) : parser<char> = satisfy <| (=) c
-
-// // // let rec traverse (f : 'a -> parser<'b>) (xs : List<'a>) : parser<List<'b>> =
-// // //   match xs with
-// // //   | [] -> just []
-// // //   | x :: xs -> parser {
-// // //     let! x  =          f x
-// // //     let! xs = traverse f xs
-// // //     return x :: xs
-// // //   }
-
-// // // let str (s : string) : parser<string> =
-// // //   traverse char (Seq.toList s)
-// // //     |> trace
-// // //     |> deco s
-
-// // // let number : parser<either<int, float>> =
-// // //   parser {
-// // //     let! sign  = option "" <| str "-"
-// // //     let! start = trace (some digit)
-// // //     let! rest = optional <| trace (parser {
-// // //       let! dot = str "."
-// // //       let! fin = trace (some digit)
-// // //       return dot + fin
-// // //     })
-// // //     return
-// // //       match rest with
-// // //       | None      -> Ok  (int   (sign + start))
-// // //       | Some rest -> Err (float (sign + start + rest))
-// // //   }
-// // //   |> deco "number"
-
-// // // let charLit =
-// // //   select
-// // //     [ parser
-// // //         { let! () = notFollowedBy <| select [str "\\"; str "\""]
-// // //           let! c  = satisfy <| fun _ -> true
-// // //           return c
-// // //         }
-
-// // //       parser
-// // //         { let! _ = str "\\"
-
-// // //           let! c =
-// // //             select
-// // //               [ map (fun _ -> '\\') (str "\\")
-// // //                 map (fun _ -> '\n') (str "n")
-// // //                 map (fun _ -> '\"') (str "\"")
-// // //               ]
-// // //           return c
-// // //         }
-// // //     ]
-
-// // // let stringLit = trace (many charLit)
-
-// // // let charLiteral =
-// // //   parser {
-// // //     let! _ = char '\''
-// // //     let! c = charLit
-// // //     let! _ = char '\''
-// // //     return c
-// // //   } |> deco "char literal"
-
-// // // let stringLiteral =
-// // //   parser {
-// // //     let! _ = char '\"'
-// // //     let! c = stringLit
-// // //     let! _ = char '\"'
-// // //     return c
-// // //   } |> deco "string literal"
-
-// // // let token (p : parser<'a>) : parser<'a> =
-// // //   parser {
-// // //     let! a = p
-// // //     let! _ = many <| satisfy (fun c -> System.Char.IsWhiteSpace(c))
-// // //     return a
-// // //   }
-
-// // // let report (i : input) a : string =
-// // //   let before =
-// // //     i.text[0.. i.shift - 1]
-// // //       |> Seq.rev
-// // //       |> Seq.toList
-// // //       |> List.takeWhile ((<>) '\n')
-// // //       |> List.rev
-// // //       |> List.map string
-// // //       |> String.concat ""
-
-// // //   let after =
-// // //     i.text[i.shift..]
-// // //       |> Seq.toList
-// // //       |> List.takeWhile ((<>) '\n')
-// // //       |> List.rev
-// // //       |> List.map string
-// // //       |> String.concat ""
-
-// // //   before + after + "\n" + String.replicate before.Length " " + "^" + "\n" + a.ToString()
-
-// // // let testParser (ma : parser<'a>) (i : string) : unit =
-// // //   match ma.parse {text = i; shift = 0} with
-// // //   | {result = Ok  a}             -> printfn "%O"    a
-// // //   | {result = Err a; output = j} -> printfn "%s" <| report {text = i; shift = j} a
-
-// // // type list =
-// // //   { elems : List<value>
-// // //     trail : option<value>
-// // //   }
-
-// // // and value =
-// // //   | Atom  of string
-// // //   | Var   of string
-// // //   | Int   of int
-// // //   | Float of float
-// // //   | Bool  of bool
-// // //   | Str   of string
-// // //   | Char  of char
-// // //   | List  of list
-
-// // // let atom : parser<value> = parser {
-// // //   let! _ = str ":"
-// // //   let! a = name
-// // //   return Atom a
-// // // }
-
-// // // let var : parser<value> = map Var name
-
-// // // let numLit : parser<value> = map (either Int Float) number
-
-// // // let boolLit : parser<value> =
-// // //   parser {
-// // //     let! _ = str "#"
-// // //     let! b =
-// // //       select
-// // //         [ map (fun _ -> true) (str "t")
-// // //           map (fun _ -> true) (str "f")
-// // //         ]
-// // //     return Bool b
-// // //   } |> deco "boolean literal"
-
-// // // let strVal  : parser<value> = map Str  stringLiteral
-// // // let charVal : parser<value> = map Char charLiteral
-
-// // // let rec value : parser<value> =
-// // //   token <| select
-// // //     [ atom
-// // //       var
-// // //       numLit
-// // //       boolLit
-// // //       strVal
-// // //       charVal
-// // //       map List listp
-// // //     ]
-
-// // // and listp : parser<list> = parser {
-// // //   let! close =
-// // //     token <| select
-// // //       [ map (fun _ -> "]") (str "[")
-// // //         map (fun _ -> "}") (str "{")
-// // //         map (fun _ -> ")") (str "(")
-// // //       ]
-// // //   let! elems = some value
-// // //   let! trail =
-// // //     optional <| parser {
-// // //       let! _ = token (str ".")
-// // //       let! e = value
-// // //       return e
-// // //     }
-// // //   let! _ = token (str close)
-// // //   return
-// // //     { elems = elems
-// // //       trail = trail
-// // //     }
-// // // }
+(*
+  Run parser.
+*)
+let testParser
+  (ma    : parser<token, 'a>)  // parser to run
+  (input : input)              // source
+  (k     : 'a -> 'b)           // what to do on success
+         : option<'b> =
+  let toks, rest = tokens input
+  if Input.eos rest
+  then
+    let a = ma toks
+    match a.produce with
+    | Some a -> Some (k a)
+    | None   ->
+      printfn "%s"
+        <| report (pos a.output input)
+         + "expected " + toText a.expected
+      None
+  else
+    printfn "%s"
+      <| report rest + "Cannot tokenize."
+    None

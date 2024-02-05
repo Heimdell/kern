@@ -1,4 +1,4 @@
-
+﻿
 open Lexer
 open Parser
 open Raw
@@ -12,7 +12,7 @@ let rec echo () =
 
   ignore <| testParser acted
     (Input.ofString line)
-    (printfn "%s" << ppActed << snd)
+    (printfn "%s" << ppValue)
 
   System.Console.WriteLine ""
 

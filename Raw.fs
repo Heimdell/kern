@@ -3,41 +3,49 @@ module Raw
 
 open Input
 
-(*
-  LISP-list. Includes
-  - ()
-  - (1 2 3)
-  - (1 2 3 . 4)
-*)
-type list =
-  { kind  : int                    // ( [ {
-    elems : sequence               // main elements
-    trail : option<input * acted>  // rest-elements
-  }
-
-(*
-  Sequence of elements.
-*)
-and sequence = list<input * acted>
-
-(*
-  Atom with possible QUOTE or SPLICE manipulators.
-*)
-and acted =
-  | Quoted  of acted
-  | Spliced of acted
-  | Plain   of value
-
-(*
-  Atomic expression.
-*)
-and value =
+type atom =
   | VName of string
   | VNum  of float
   | VBool of bool
   | VStr  of string
   | VChar of char
-  | VList of list
+
+
+(*
+  Atomic expression.
+*)
+and value =
+  | VAtom of atom
+  | VCons of cons
+  | VNil
+
+and cons =
+  { car : value
+    cdr : value
+  }
+
+let cons (a : value) (d : value) : value =
+  VCons
+    { car = a
+      cdr = d
+    }
+
+let app (f : string) (x : value) : value =
+  cons (VAtom (VName f)) x
+
+let quote (x : value) : value =
+  app "QUOTE" (cons x VNil)
+
+let listToCons (elems : list<value>) (trail : option<value>) : value =
+  List.foldBack cons elems (trail |> Option.defaultValue VNil)
+
+let rec consToList (c : cons) : list<value> * option<value> =
+  match c.cdr with
+  | VNil -> [c.car], None
+  | VCons d ->
+    let xs, rest = consToList d
+    c.car :: xs, rest
+  | other -> [c.car], Some other
 
 (*
   Opening paren of given type.
@@ -57,22 +65,7 @@ let opening (i : int) =
   | 2 -> "["
   | _ -> "{"
 
-(*
-  Pretty-print list.
-*)
-let rec ppList : list -> string =
-  fun list ->
-    opening list.kind
-      + String.concat " " (List.map (ppActed << snd) list.elems)
-      + match list.trail with
-        | None   -> ""
-        | Some x -> " . " + ppActed (snd x)
-      + closing list.kind
-
-(*
-  Pretty-print value.
-*)
-and ppValue : value -> string =
+let ppAtom =
   function
   | VName name -> name
   | VNum  n    -> n.ToString()
@@ -80,19 +73,51 @@ and ppValue : value -> string =
   | VBool _    -> "#false"
   | VStr  n    -> "\"" + n.ToString() + "\""
   | VChar n    -> "#\"" + string(n) + "\""
-  | VList n    -> ppList n
 
-(*
-  Pretty-print QUOTE/SPLICE-d value.
-*)
-and ppActed : acted -> string =
+let rec ppValue : value -> string =
   function
-  | Quoted  act -> "'" + ppActed act
-  | Spliced act -> "," + ppActed act
-  | Plain   act ->       ppValue act
+  | VAtom a -> ppAtom a
+  | VNil    -> "()"
+  | VCons c ->
+    let xs, trail = consToList c
+    "("
+      + String.concat " " (List.map ppValue xs)
+      + match trail with
+        | Some x -> " . " + ppValue x
+        | None   -> ""
+      + ")"
 
-(*
-  Pretty-print sequence.
-*)
-let ppSeq : sequence -> string =
-  String.concat "\n\n" << List.map (ppActed << snd)
+// (*
+//   Pretty-print list.
+// *)
+// let rec ppList : list -> string =
+//   fun list ->
+//     opening list.kind
+//       + String.concat " " (List.map (ppActed << snd) list.elems)
+//       + match list.trail with
+//         | None   -> ""
+//         | Some x -> " . " + ppActed (snd x)
+//       + closing list.kind
+
+// (*
+//   Pretty-print value.
+// *)
+// and ppValue : value -> string =
+//   function
+//   | VAtom a -> ppAtom a
+//   | VList n -> ppList n
+
+// (*
+//   Pretty-print QUOTE/SPLICE-d value.
+// *)
+// and ppActed : acted -> string =
+//   function
+//   | Quoted  act -> "'" + ppActed act
+//   | Spliced act -> "," + ppActed act
+//   | Plain   act ->       ppValue act
+
+// (*
+//   Pretty-print sequence.
+// *)
+// let ppSeq : sequence -> string =
+//   String.concat "\n\n" << List.map (ppActed << snd)

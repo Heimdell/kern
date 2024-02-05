@@ -7,4 +7,4 @@
 ('list 1 2 3)
 
 ; splice
-'(foo ,qwqe . ,asdad)
+'(foo qwqe . asdad)

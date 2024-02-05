@@ -77,58 +77,52 @@ let dump : parser<token, tokens<token>> =
       produce  = Some input
     }
 
+let anAtom =
+  parser {
+    return! map (VName << snd) tokName
+    return! map (VNum  << snd) tokNumber
+    return! map (VBool << snd) tokBoolean
+    return! map (VStr  << snd) tokString
+    return! map (VChar << snd) tokChar
+  }
+
 (*
   Parse sequence of manipulated atoms.
 *)
-let rec sequence : parser<token, List<input * acted>> =
+let rec sequence : parser<token, List<value>> =
   many acted
 
 (*
   Parse one manipulated atom.
 *)
-and acted : parser<token, input * acted> =
+and acted : parser<token, value> =
   parser {
-    return! spliced
     return! quoted
-    return! map (second Plain) atomic
+    return! atomic
   }
-
-(*
-  Parse splice of atom.
-*)
-and spliced : parser<token, input * acted> =
-  parser {
-    let! () = tokSplice
-    return! map (second Spliced) acted
-  }
-
 (*
   Parse quote of atom.
 *)
-and quoted : parser<token, input * acted> =
+and quoted : parser<token, value> =
   parser {
     let! () = tokQuote
-    return! map (second Quoted) acted
+    return! map quote acted
   }
 
 (*
   Parse atom.
 *)
-and atomic : parser<token, input * value> =
+and atomic : parser<token, value> =
   parser {
-    return! map (second VList) aList
-    return! map (second VName) tokName
-    return! map (second VNum)  tokNumber
-    return! map (second VBool) tokBoolean
-    return! map (second VStr)  tokString
-    return! map (second VChar) tokChar
+    return! aList
+    return! map VAtom anAtom
   }
 
 (*
   Parse list of manipulated atoms.
 *)
 
-and aList : parser<token, input * list> =
+and aList : parser<token, value> =
   parser {
     let! pos, i = tokOpen
     let! elems, trail =
@@ -142,11 +136,7 @@ and aList : parser<token, input * list> =
         return elems, trail
       }
     let! ()     = tokClose i
-    return pos,
-      { kind  = i
-        elems = elems
-        trail = trail
-      }
+    return listToCons elems trail
   }
 
 (*

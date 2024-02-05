@@ -275,3 +275,13 @@ let pos (toks : Option<tokens<'a>>) (input : input) : input =
   | Some ((pos, _) :: _) -> pos
   | Some []              -> Input.endOf input
   | None                 -> input
+
+let getPosition : parser<'tok, input> =
+  fun input ->
+    { produce =
+        match input with
+        | [] -> None
+        | (pos, _) :: _ -> Some pos
+      output   = None
+      expected = Set []
+    }

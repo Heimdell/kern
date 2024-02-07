@@ -3,6 +3,9 @@ module Raw
 
 open Input
 
+(*
+  Atomic expression.
+*)
 type atom =
   | VName of string
   | VNum  of float
@@ -10,10 +13,6 @@ type atom =
   | VStr  of string
   | VChar of char
 
-
-(*
-  Atomic expression.
-*)
 and value =
   | VAtom of atom
   | VCons of cons
@@ -65,7 +64,7 @@ let opening (i : int) =
   | 2 -> "["
   | _ -> "{"
 
-let ppAtom =
+let ppAtom : atom -> string =
   function
   | VName name -> name
   | VNum  n    -> n.ToString()
@@ -86,38 +85,3 @@ let rec ppValue : value -> string =
         | Some x -> " . " + ppValue x
         | None   -> ""
       + ")"
-
-// (*
-//   Pretty-print list.
-// *)
-// let rec ppList : list -> string =
-//   fun list ->
-//     opening list.kind
-//       + String.concat " " (List.map (ppActed << snd) list.elems)
-//       + match list.trail with
-//         | None   -> ""
-//         | Some x -> " . " + ppActed (snd x)
-//       + closing list.kind
-
-// (*
-//   Pretty-print value.
-// *)
-// and ppValue : value -> string =
-//   function
-//   | VAtom a -> ppAtom a
-//   | VList n -> ppList n
-
-// (*
-//   Pretty-print QUOTE/SPLICE-d value.
-// *)
-// and ppActed : acted -> string =
-//   function
-//   | Quoted  act -> "'" + ppActed act
-//   | Spliced act -> "," + ppActed act
-//   | Plain   act ->       ppValue act
-
-// (*
-//   Pretty-print sequence.
-// *)
-// let ppSeq : sequence -> string =
-//   String.concat "\n\n" << List.map (ppActed << snd)

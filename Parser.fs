@@ -77,6 +77,28 @@ let dump : parser<token, tokens<token>> =
       produce  = Some input
     }
 
+(*
+  anAtom   = <name>
+           | <number>
+           | <boolean>
+           | <string>
+           | <char>
+
+  sequence = MANY acted
+  acted    = quoted | atomic
+  quoted   = "'" acted
+  atomic   = aList | anAtom
+  aList    = "(" (SOME acted ("." acted)?)? ")"
+
+  aList = ()
+          (1)
+          (1 . ())
+          (1 2 3)
+          (1 . (2 3))
+          (1 . (2 . 3))
+          ...
+*)
+
 let anAtom =
   parser {
     return! map (VName << snd) tokName
@@ -88,20 +110,27 @@ let anAtom =
 
 (*
   Parse sequence of manipulated atoms.
+
+  sequence = acted*
 *)
 let rec sequence : parser<token, List<value>> =
   many acted
 
 (*
   Parse one manipulated atom.
+
+  acted = quoted | atomic
 *)
 and acted : parser<token, value> =
   parser {
     return! quoted
     return! atomic
   }
+
 (*
   Parse quote of atom.
+
+  quoted = "'" acted
 *)
 and quoted : parser<token, value> =
   parser {
@@ -111,6 +140,8 @@ and quoted : parser<token, value> =
 
 (*
   Parse atom.
+
+  atomic = aList | anAtom
 *)
 and atomic : parser<token, value> =
   parser {
@@ -120,6 +151,8 @@ and atomic : parser<token, value> =
 
 (*
   Parse list of manipulated atoms.
+
+  aList = "(" (acted+ ("." acted)?)? ")"
 *)
 
 and aList : parser<token, value> =

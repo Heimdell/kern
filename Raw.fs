@@ -33,7 +33,7 @@ let app (f : string) (x : value) : value =
   cons (VAtom (VName f)) x
 
 let quote (x : value) : value =
-  app "QUOTE" (cons x VNil)
+  app "quote" (cons x VNil)
 
 let listToCons (elems : list<value>) (trail : option<value>) : value =
   List.foldBack cons elems (trail |> Option.defaultValue VNil)
@@ -85,3 +85,8 @@ let rec ppValue : value -> string =
         | Some x -> " . " + ppValue x
         | None   -> ""
       + ")"
+
+let ppSeq : List<value> -> string = fun s ->
+  "("
+    + String.concat " " (List.map ppValue s)
+    + ")"

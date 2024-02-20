@@ -22,3 +22,13 @@ type LexerMonad () =
   member it.Zero ()   = None         // empty
 
 let opt = new LexerMonad()
+
+let rec traverse (f : 'a -> option<'b>) (xs : list<'a>) : option<list<'b>> =
+  opt {
+    match xs with
+    | [] -> return []
+    | a :: az ->
+      let! b = f a
+      let! bs = traverse f az
+      return b :: bs
+  }

@@ -342,11 +342,17 @@ let appendF : string * run =
     | Ok  (a, (b, ())) -> Ok (Ok  (a @ b))
     | Err (a, (b, ())) -> Ok (Err (a + b))
 
+let rec pairwise (p : 'a -> 'a -> bool) : list<'a> -> bool =
+  function
+  | a :: b :: az -> p a b && pairwise p (b :: az)
+  | other        -> true
+
+
 let binaryOrder =
-    (    (    (aFloat  .&&. (aFloat  .&&. aUnit))
-         .||. ((aString .&&. (aString .&&. aUnit))
-         .||. ((aChar   .&&. (aChar   .&&. aUnit))
-         .||. (aBool   .&&. (aBool   .&&. aUnit))
+    (    (     aListOf aFloat
+         .||. (aListOf aString
+         .||. (aListOf aChar
+         .||.  aListOf aBool
          )))
     .->. aBool
     )
@@ -354,34 +360,34 @@ let binaryOrder =
 let lessF =
   decl "<" binaryOrder <|
     function
-    |           Ok  (l, (r, ()))   -> Ok (l < r)
-    | Err      (Ok  (l, (r, ())))  -> Ok (l < r)
-    | Err (Err (Ok  (l, (r, ())))) -> Ok (l < r)
-    | Err (Err (Err (l, (r, ())))) -> Ok (l < r)
+    |           Ok  az   -> Ok (pairwise (<) az)
+    | Err      (Ok  az)  -> Ok (pairwise (<) az)
+    | Err (Err (Ok  az)) -> Ok (pairwise (<) az)
+    | Err (Err (Err az)) -> Ok (pairwise (<) az)
 
 let leqF =
   decl "<=" binaryOrder <|
     function
-    |           Ok  (l, (r, ()))   -> Ok (l <= r)
-    | Err      (Ok  (l, (r, ())))  -> Ok (l <= r)
-    | Err (Err (Ok  (l, (r, ())))) -> Ok (l <= r)
-    | Err (Err (Err (l, (r, ())))) -> Ok (l <= r)
+    |           Ok  az   -> Ok (pairwise (<=) az)
+    | Err      (Ok  az)  -> Ok (pairwise (<=) az)
+    | Err (Err (Ok  az)) -> Ok (pairwise (<=) az)
+    | Err (Err (Err az)) -> Ok (pairwise (<=) az)
 
 let greaterF =
   decl ">" binaryOrder <|
     function
-    |           Ok  (l, (r, ()))   -> Ok (l > r)
-    | Err      (Ok  (l, (r, ())))  -> Ok (l > r)
-    | Err (Err (Ok  (l, (r, ())))) -> Ok (l > r)
-    | Err (Err (Err (l, (r, ())))) -> Ok (l > r)
+    |           Ok  az   -> Ok (pairwise (>) az)
+    | Err      (Ok  az)  -> Ok (pairwise (>) az)
+    | Err (Err (Ok  az)) -> Ok (pairwise (>) az)
+    | Err (Err (Err az)) -> Ok (pairwise (>) az)
 
 let geqF =
-  decl ">" binaryOrder <|
+  decl ">=" binaryOrder <|
     function
-    |           Ok  (l, (r, ()))   -> Ok (l >= r)
-    | Err      (Ok  (l, (r, ())))  -> Ok (l >= r)
-    | Err (Err (Ok  (l, (r, ())))) -> Ok (l >= r)
-    | Err (Err (Err (l, (r, ())))) -> Ok (l >= r)
+    |           Ok  az   -> Ok (pairwise (>=) az)
+    | Err      (Ok  az)  -> Ok (pairwise (>=) az)
+    | Err (Err (Ok  az)) -> Ok (pairwise (>=) az)
+    | Err (Err (Err az)) -> Ok (pairwise (>=) az)
 
 let equalValue (l : value) (r : value) : bool = false
 
@@ -401,10 +407,10 @@ let rec equalRun (l : run) (r : run) : bool =
   | BIF   l   , BIF   r   -> false
   | _                     -> false
 
-let equality = (aRun .&&. (aRun .&&. aUnit)) .->. aBool
+let equality = aListOf aRun .->. aBool
 
-let equalF = decl "="  equality <| fun (a, (b, ())) -> Ok      (equalRun a b)
-let neqF   = decl "/=" equality <| fun (a, (b, ())) -> Ok (not (equalRun a b))
+let equalF = decl "="  equality <| fun ab -> Ok      (pairwise equalRun ab)
+let neqF   = decl "/=" equality <| fun ab -> Ok (not (pairwise equalRun ab))
 
 let printF =
   decl "print"
@@ -416,7 +422,7 @@ let printF =
     <| fun elems ->
       for elem in elems do
         match elem with
-        | Ok (Ok  num)   -> printf "%f" num
+        | Ok (Ok  num)   -> printf "%O" num
         | Ok (Err true)  -> printf "true"
         | Ok (Err false) -> printf "false"
         | Err (Ok  c)    -> printf "%c" c

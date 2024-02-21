@@ -323,13 +323,14 @@ let condR : runner =
         return! run body
       }
 
-let binaryArith = (aFloat .&&. (aFloat .&&. aUnit)) .->. aFloat
+let binaryArith = aListOf aFloat .->. aFloat
+let binaryArith1 = (aFloat .&&. aListOf aFloat) .->. aFloat
 
-let plusF  = decl "+"   binaryArith <| fun (a, (b, ())) -> Ok (a + b)
-let minusF = decl "-"   binaryArith <| fun (a, (b, ())) -> Ok (a - b)
-let multF  = decl "*"   binaryArith <| fun (a, (b, ())) -> Ok (a * b)
-let divF   = decl "/"   binaryArith <| fun (a, (b, ())) -> Ok (a / b)
-let modF   = decl "mod" binaryArith <| fun (a, (b, ())) -> Ok (a % b)
+let plusF  = decl "+"   binaryArith  <| fun az -> Ok (List.fold (+) 0 az)
+let minusF = decl "-"   binaryArith  <| fun az -> Ok (List.fold (-) 0 az)
+let multF  = decl "*"   binaryArith  <| fun az -> Ok (List.fold (*) 1 az)
+let divF   = decl "/"   binaryArith1 <| fun (a, az) -> Ok (List.fold (/) a az)
+let modF   = decl "mod" binaryArith1 <| fun (a, az) -> Ok (List.fold (%) a az)
 
 let appendF : string * run =
   decl "++"
